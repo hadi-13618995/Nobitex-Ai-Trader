@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import requests
 import pandas as pd
 import streamlit as st
@@ -14,18 +12,33 @@ st.write("اسکن بازار نوبیتکس و نمایش ارزهای دارا
 
 API = "https://api.nobitex.ir/market/stats"
 
+
 @st.cache_data(ttl=60)
 def get_market():
+
     try:
-        response = requests.get(API, timeout=10)
+        response = requests.get(
+            API,
+            params={
+                "srcCurrency": "all",
+                "dstCurrency": "usdt"
+            },
+            timeout=30,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        response.raise_for_status()
+
         data = response.json()
 
         stats = data.get("stats", {})
-
         rows = []
 
         for symbol, item in stats.items():
-            if not symbol.endswith("usdt"):
+
+            if not symbol.lower().endswith("usdt"):
                 continue
 
             try:
@@ -37,20 +50,28 @@ def get_market():
                     "قیمت": price,
                     "تغییر ۲۴ ساعت": day_change
                 })
-            except:
-                pass
+
+            except (TypeError, ValueError):
+                continue
 
         return pd.DataFrame(rows)
 
     except Exception as e:
-        st.error(f"خطا در دریافت اطلاعات: {e}")
+
+        st.error(
+            f"خطا در دریافت اطلاعات نوبیتکس: {e}"
+        )
+
         return pd.DataFrame()
 
 
 df = get_market()
 
+
 if df.empty:
+
     st.warning("اطلاعات بازار دریافت نشد.")
+
 else:
 
     df = df.sort_values(
@@ -63,8 +84,14 @@ else:
     top = df.head(20).copy()
 
     top["سیگنال"] = top["تغییر ۲۴ ساعت"].apply(
-        lambda x: "🟢 صعودی" if x > 3 else
-        ("🟡 مثبت" if x > 0 else "🔴 نزولی")
+        lambda x:
+        "🟢 صعودی"
+        if x > 3
+        else (
+            "🟡 مثبت"
+            if x > 0
+            else "🔴 نزولی"
+        )
     )
 
     st.dataframe(
@@ -80,10 +107,13 @@ else:
 
             st.success(
                 f"🟢 {row['ارز']} | "
-                f"رشد ۲۴ساعته: {row['تغییر ۲۴ ساعت']:.2f}% | "
+                f"رشد ۲۴ساعته: "
+                f"{row['تغییر ۲۴ ساعت']:.2f}% | "
                 f"قیمت: {row['قیمت']}"
             )
 
+
 st.caption(
-    "این برنامه فقط تحلیل و نمایش اطلاعات بازار است و سفارش خرید یا فروش ثبت نمی‌کند."
+    "این برنامه فقط تحلیل و نمایش اطلاعات بازار است "
+    "و سفارش خرید یا فروش ثبت نمی‌کند."
 )
